@@ -4,9 +4,11 @@
 #include <Adafruit_BMP085.h>
 
 // CONSTANTES
-#define KInput 0.210
+#define KInput 0.201
 #define KOutput 0.218
 #define SOUND_VELOCITY 331 // m/s
+#define Kp 30.615
+#define Ki 0.045
 
 // PINES
 const byte FlowmeterIn = 14,  // (D5) Sensor de entrada al tanque
@@ -19,12 +21,16 @@ const byte FlowmeterIn = 14,  // (D5) Sensor de entrada al tanque
 Adafruit_BMP085 bmp;          // D1=SCL D2=SDA Sensor de Temperatura
 
 // VARIABLES
-int PWMset = 0;
 double QIn = 0, QOut = 0; // Caudales medidos
 volatile int CountIn = 0, CountOut = 0; //Contadores de pulsos
-unsigned long TimeRef = 0; 
+unsigned long TimeRef = 0, PreviousTime = 0, CurrentTime = 0, Ts = 0; 
 long Duration;
 float Distance,Height,Level,SoundVel;
+String command;
+// PI CONTROLLER
+float setpoint = 23.848;
+int PWMset = 0, PWM_prev = 0;
+float error = 0, error_prev = 0, integral = 0;
 
 // put function declarations here:
 void SetPins();
@@ -52,9 +58,13 @@ void setup() {
   Serial.print("Distancia al Fondo:");
   Serial.print(Height);
   Serial.println("[cm].");
-  delay(5000);
+  delay(1000);
+  Serial.println("Esperando...");
+  do {
+    command = Serial.readStringUntil('\n');
+  } while (command != "s");
   digitalWrite(StandBy, HIGH);
-  analogWrite(WaterPump,PWMset);
+  PreviousTime = millis();
 }
 
 void loop() {
@@ -62,17 +72,36 @@ void loop() {
   CountIn = 0;
   CountOut = 0;
   TimeRef = millis();
+  // Mido el Caudal
   interrupts();
   while((millis() - TimeRef) < 1000){
     QIn = (CountIn * KInput);
     QOut = (CountOut * KOutput);
-    PWMset = analogRead(Adjust);
-    analogWrite(WaterPump, PWMset);
   }
   noInterrupts();
+  // Leer el setpoint desde el puerto serie
+  if (Serial.available() > 0) {
+      command = Serial.readStringUntil('\n');
+      setpoint = command.toFloat(); // Convertir el valor leído a float
+  }
+  // Calcular el periodo de muestreo
+  CurrentTime = millis();
+  Ts = (CurrentTime - PreviousTime) / 1000.0; // Convertir a segundos
+  PreviousTime = CurrentTime;
+  // Obtención del Nivel Actual
   Duration = UltrasonicSensor(Trigger, Echo);
   Distance = Duration * SoundVel/2;
   Level = Height - Distance;
+  // Calculo el PWM con el controlador PI
+  error = setpoint - Level;
+  integral = error + error_prev;
+  PWMset = (error * Kp) + PWM_prev + (Ki*Ts*0.5*integral);
+  if(PWMset >= 1023){PWMset=1023;}
+  if(PWMset <= 0){PWMset=0;}
+  analogWrite(WaterPump,PWMset);
+  error_prev = error;
+  PWM_prev = PWMset;
+  // Envio los datos por puerto serie
   SendData(QIn,QOut,Level,PWMset);
 }
 
