@@ -7,27 +7,27 @@
 #define KInput 0.201
 #define KOutput 0.218
 #define SOUND_VELOCITY 331 // m/s
-#define Kp 30.615
-#define Ki 0.045
-#define HEIGHT 54.67
+#define Kp 35.615
+#define Ki 4.58
+#define HEIGHT 54.58
 
 // PINES
-const byte FlowmeterIn = 14,  // (D5) Sensor de entrada al tanque
-           FlowmeterOut = 12, // (D6) Sensor de salida del tanque
-           StandBy = 13,      // (D7) Enable TB6612FNG
-           WaterPump = 15,    // (D8) Bomba de Agua
-           Adjust = A0,       // ADC
-           Trigger = 0,       // (D3) Emisor del HC-SR04
-           Echo = 2;          // (D4) Receptor del HC-SR04
-Adafruit_BMP085 bmp;          // D1=SCL D2=SDA Sensor de Temperatura
+const byte FlowmeterIn = 14, // (D5) Sensor de entrada al tanque
+    FlowmeterOut = 12,       // (D6) Sensor de salida del tanque
+    StandBy = 13,            // (D7) Enable TB6612FNG
+    WaterPump = 15,          // (D8) Bomba de Agua
+    Adjust = A0,             // ADC
+    Trigger = 0,             // (D3) Emisor del HC-SR04
+    Echo = 2;                // (D4) Receptor del HC-SR04
+Adafruit_BMP085 bmp;         // D1=SCL D2=SDA Sensor de Temperatura
 
 // VARIABLES
-double QIn = 0, QOut = 0; // Caudales medidos
-volatile int CountIn = 0, CountOut = 0; //Contadores de pulsos
-unsigned long TimeRef = 0, PreviousTime = 0, CurrentTime = 0, Ts = 0; 
+double QIn = 0, QOut = 0;               // Caudales medidos
+volatile int CountIn = 0, CountOut = 0; // Contadores de pulsos
+unsigned long TimeRef = 0, PreviousTime = 0, CurrentTime = 0, Ts = 0;
 long Duration;
 const int NumReadings = 10;
-float Distance,SoundVel,LevelAVG,LevelTotal,Readings[10]; //Height;
+float Distance, SoundVel, LevelAVG, LevelTotal, Readings[10]; // Height;
 int Index = 0;
 String command = "nothing";
 // PI CONTROLLER
@@ -43,66 +43,79 @@ long UltrasonicSensor(byte TPin, byte EPin);
 float SetSoundVelocity();
 void SendData(double x1, double x2, float x3, int x4, int x5);
 
-void setup() {
+void setup()
+{
   // put your setup code here, to run once:
   delay(500);
   Serial.begin(115200);
   SetPins();
   // Inicializo el vector de lecturas en cero
-  for (int i=0;i<NumReadings;i++){
-    Readings[i]=0;
+  for (int i = 0; i < NumReadings; i++)
+  {
+    Readings[i] = 0;
   }
   // Seteo el rango del PWM a 0-1023 y la frecuencia a 1KHz
   analogWriteRange(1023);
   analogWriteFreq(1000);
   // Configuro los pines de interrupción para los caudalímetros
-  attachInterrupt(digitalPinToInterrupt(FlowmeterIn),FlowIn,RISING);
-  attachInterrupt(digitalPinToInterrupt(FlowmeterOut),FlowOut,RISING);
+  attachInterrupt(digitalPinToInterrupt(FlowmeterIn), FlowIn, RISING);
+  attachInterrupt(digitalPinToInterrupt(FlowmeterOut), FlowOut, RISING);
   // Inicializo la comunicación SPI con el BMP180
-  if(!bmp.begin()) {
+  if (!bmp.begin())
+  {
     Serial.println("Fallo en la comunicacion.");
-    while(1){}
+    while (1)
+    {
+    }
   }
   SoundVel = SetSoundVelocity();
   // Leo el potenciometro seteando un primer setpoint
   setpoint = analogRead(Adjust);
-  setpoint = map(setpoint,0,1023,10,40);
+  setpoint = map(setpoint, 0, 1023, 10, 40);
   Serial.println(setpoint);
   // Se espera el comando de inicio
   Serial.println("Esperando...");
-  do {
+  do
+  {
     command = Serial.readStringUntil('\n');
   } while (command != "start");
   digitalWrite(StandBy, HIGH);
   PreviousTime = millis();
 }
 
-void loop() {
+void loop()
+{
   // put your main code here, to run repeatedly:
   CountIn = 0;
   CountOut = 0;
   TimeRef = millis();
   // Mido el Caudal
   interrupts();
-  while((millis() - TimeRef) < 1000){
+  while ((millis() - TimeRef) < 1000)
+  {
     QIn = (CountIn * KInput);
     QOut = (CountOut * KOutput);
   }
   noInterrupts();
   // Obtención del Nivel Actual
   Duration = UltrasonicSensor(Trigger, Echo);
-  Distance = Duration * SoundVel/2;
-  LevelTotal = LevelTotal - Readings[Index];
-  Readings[Index] = HEIGHT - Distance;
-  LevelTotal = LevelTotal + Readings[Index];
-  Index++;
-  if(Index >= NumReadings){
-    Index = 0;
+  Distance = Duration * SoundVel / 2;
+  if (Distance >= 15)
+  {
+    /*LevelTotal = LevelTotal - Readings[Index];
+    Readings[Index] = HEIGHT - Distance;
+    LevelTotal = LevelTotal + Readings[Index];
+    Index++;
+    if (Index >= NumReadings)
+    {
+      Index = 0;
+    }
+    LevelAVG = LevelTotal / NumReadings;*/
+    LevelAVG = HEIGHT - Distance;
   }
-  LevelAVG = LevelTotal / NumReadings;
   // Leo el potenciometro para saber el setpoint del nivel
   setpoint = analogRead(Adjust);
-  setpoint = map(setpoint,0,1023,10,40);
+  setpoint = map(setpoint, 0, 1023, 10, 40);
   // Calcular el periodo de muestreo
   CurrentTime = millis();
   Ts = (CurrentTime - PreviousTime) / 1000.0; // Convertir a segundos
@@ -110,47 +123,58 @@ void loop() {
   // Calculo el PWM con el controlador PI
   error = setpoint - LevelAVG;
   integral = error + error_prev;
-  PWMset = (error * Kp) + PWM_prev + (Ki*Ts*0.5*integral);
-  if(PWMset >= 1023){PWMset=1023;}
-  if(PWMset <= 0){PWMset=0;}
-  analogWrite(WaterPump,PWMset);
+  PWMset = (error * Kp) + PWM_prev + (Ki * Ts * 0.5 * integral);
+  if (PWMset >= 1023)
+  {
+    PWMset = 1023;
+  }
+  if (PWMset <= 0)
+  {
+    PWMset = 0;
+  }
+  analogWrite(WaterPump, PWMset);
   error_prev = error;
   PWM_prev = PWMset;
   // Envio los datos por puerto serie
-  SendData(QIn,QOut,LevelAVG,PWMset,setpoint);
+  SendData(QIn, QOut, LevelAVG, PWMset, setpoint);
 }
 
 // put function definitions here:
-void IRAM_ATTR FlowIn() {
+void IRAM_ATTR FlowIn()
+{
   CountIn++;
 }
 
-void IRAM_ATTR FlowOut() { 
+void IRAM_ATTR FlowOut()
+{
   CountOut++;
 }
 
-long UltrasonicSensor(byte TPin, byte EPin){
+long UltrasonicSensor(byte TPin, byte EPin)
+{
   long Response;
-  //Asegura el 0 en el trigger
+  // Asegura el 0 en el trigger
   digitalWrite(TPin, LOW);
   delayMicroseconds(2);
-  //Set trigger en 1 por 10us
-  digitalWrite(TPin,HIGH);
+  // Set trigger en 1 por 10us
+  digitalWrite(TPin, HIGH);
   delayMicroseconds(10);
-  digitalWrite(TPin,LOW);
-  Response = pulseIn(EPin,HIGH);
+  digitalWrite(TPin, LOW);
+  Response = pulseIn(EPin, HIGH);
   return Response;
 }
 
-float SetSoundVelocity(){
-  float Tc,SV;
+float SetSoundVelocity()
+{
+  float Tc, SV;
   Tc = bmp.readTemperature();
-  SV = SOUND_VELOCITY * sqrt(1.0+(Tc/273.0));
-  SV = SV/10000.0;
+  SV = SOUND_VELOCITY * sqrt(1.0 + (Tc / 273.0));
+  SV = SV / 10000.0;
   return SV;
 }
 
-void SendData(double x1, double x2, float x3, int x4, int x5) {
+void SendData(double x1, double x2, float x3, int x4, int x5)
+{
   Serial.print("Qi=");
   Serial.print(x1);
   Serial.print("/Qo=");
@@ -163,13 +187,14 @@ void SendData(double x1, double x2, float x3, int x4, int x5) {
   Serial.println(x5);
 }
 
-void SetPins() {
+void SetPins()
+{
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(FlowmeterIn, INPUT);
   pinMode(FlowmeterOut, INPUT);
   pinMode(StandBy, OUTPUT);
   pinMode(WaterPump, OUTPUT);
-  pinMode(Adjust,INPUT);
+  pinMode(Adjust, INPUT);
   pinMode(Trigger, OUTPUT);
   pinMode(Echo, INPUT);
 }
