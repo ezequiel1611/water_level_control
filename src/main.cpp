@@ -12,11 +12,11 @@
 #define HEIGHT 54.58
 
 // PINES
-const byte FlowmeterIn = 14, // (D5) Sensor de entrada al tanque
-    FlowmeterOut = 12,       // (D6) Sensor de salida del tanque
-    StandBy = 13,            // (D7) Enable TB6612FNG
-    WaterPump = 15,          // (D8) Bomba de Agua
-    Adjust = A0,             // ADC
+const byte FlowmeterIn = 14, // (D5) Sensor de Entrada al Tanque
+    FlowmeterOut = 12,       // (D6) Sensor de Salida del Tanque
+    LedOn = 13,              // (D7) LED Indicador de Encendido
+    WaterPump = 15,          // (D8) PWM Bomba de Agua
+    Adjust = A0,             // ADC  Setear Nivel del Agua
     Trigger = 0,             // (D3) Emisor del HC-SR04
     Echo = 2;                // (D4) Receptor del HC-SR04
 Adafruit_BMP085 bmp;         // D1=SCL D2=SDA Sensor de Temperatura
@@ -26,9 +26,7 @@ double QIn = 0, QOut = 0;               // Caudales medidos
 volatile int CountIn = 0, CountOut = 0; // Contadores de pulsos
 unsigned long TimeRef = 0, PreviousTime = 0, CurrentTime = 0, Ts = 0;
 long Duration;
-const int NumReadings = 10;
-float Distance, SoundVel, LevelAVG, LevelTotal, Readings[10]; // Height;
-int Index = 0;
+float Distance, SoundVel, Level;
 String command = "nothing";
 // PI CONTROLLER
 int setpoint = 15;
@@ -46,40 +44,32 @@ void SendData(double x1, double x2, float x3, int x4, int x5);
 void setup()
 {
   // put your setup code here, to run once:
-  delay(500);
   Serial.begin(115200);
   SetPins();
-  // Inicializo el vector de lecturas en cero
-  for (int i = 0; i < NumReadings; i++)
-  {
-    Readings[i] = 0;
-  }
   // Seteo el rango del PWM a 0-1023 y la frecuencia a 1KHz
   analogWriteRange(1023);
   analogWriteFreq(1000);
+  analogWrite(WaterPump, 0);
   // Configuro los pines de interrupción para los caudalímetros
   attachInterrupt(digitalPinToInterrupt(FlowmeterIn), FlowIn, RISING);
   attachInterrupt(digitalPinToInterrupt(FlowmeterOut), FlowOut, RISING);
   // Inicializo la comunicación SPI con el BMP180
-  if (!bmp.begin())
-  {
+  if (!bmp.begin()){
     Serial.println("Fallo en la comunicacion.");
-    while (1)
-    {
+    while (1){
+      ESP.deepSleep(0);
     }
   }
+  // Mido la velocidad del sonido
   SoundVel = SetSoundVelocity();
   // Leo el potenciometro seteando un primer setpoint
   setpoint = analogRead(Adjust);
   setpoint = map(setpoint, 0, 1023, 10, 40);
-  Serial.println(setpoint);
   // Se espera el comando de inicio
-  Serial.println("Esperando...");
-  do
-  {
+  do{
     command = Serial.readStringUntil('\n');
   } while (command != "start");
-  digitalWrite(StandBy, HIGH);
+  digitalWrite(LedOn, HIGH);
   PreviousTime = millis();
 }
 
@@ -91,8 +81,7 @@ void loop()
   TimeRef = millis();
   // Mido el Caudal
   interrupts();
-  while ((millis() - TimeRef) < 1000)
-  {
+  while ((millis() - TimeRef) < 1000){
     QIn = (CountIn * KInput);
     QOut = (CountOut * KOutput);
   }
@@ -100,43 +89,31 @@ void loop()
   // Obtención del Nivel Actual
   Duration = UltrasonicSensor(Trigger, Echo);
   Distance = Duration * SoundVel / 2;
-  if (Distance >= 15)
-  {
-    /*LevelTotal = LevelTotal - Readings[Index];
-    Readings[Index] = HEIGHT - Distance;
-    LevelTotal = LevelTotal + Readings[Index];
-    Index++;
-    if (Index >= NumReadings)
-    {
-      Index = 0;
-    }
-    LevelAVG = LevelTotal / NumReadings;*/
-    LevelAVG = HEIGHT - Distance;
+  if (Distance >= 15){
+    Level = HEIGHT - Distance; // Este if me permite deshechar malas lecturas
   }
   // Leo el potenciometro para saber el setpoint del nivel
   setpoint = analogRead(Adjust);
   setpoint = map(setpoint, 0, 1023, 10, 40);
-  // Calcular el periodo de muestreo
+  // Calcular el periodo de muestreo para el PI
   CurrentTime = millis();
   Ts = (CurrentTime - PreviousTime) / 1000.0; // Convertir a segundos
   PreviousTime = CurrentTime;
   // Calculo el PWM con el controlador PI
-  error = setpoint - LevelAVG;
+  error = setpoint - Level;
   integral = error + error_prev;
   PWMset = (error * Kp) + PWM_prev + (Ki * Ts * 0.5 * integral);
-  if (PWMset >= 1023)
-  {
+  if (PWMset >= 1023){
     PWMset = 1023;
   }
-  if (PWMset <= 0)
-  {
+  if (PWMset <= 0){
     PWMset = 0;
   }
   analogWrite(WaterPump, PWMset);
   error_prev = error;
   PWM_prev = PWMset;
   // Envio los datos por puerto serie
-  SendData(QIn, QOut, LevelAVG, PWMset, setpoint);
+  SendData(QIn, QOut, Level, PWMset, setpoint);
 }
 
 // put function definitions here:
@@ -189,10 +166,9 @@ void SendData(double x1, double x2, float x3, int x4, int x5)
 
 void SetPins()
 {
-  pinMode(LED_BUILTIN, OUTPUT);
   pinMode(FlowmeterIn, INPUT);
   pinMode(FlowmeterOut, INPUT);
-  pinMode(StandBy, OUTPUT);
+  pinMode(LedOn, OUTPUT);
   pinMode(WaterPump, OUTPUT);
   pinMode(Adjust, INPUT);
   pinMode(Trigger, OUTPUT);
