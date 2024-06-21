@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Prueba ESP8266</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="icon" type="image/png" href="favicon.png">
+        <link rel="stylesheet" type="text/css" href="style.css">
+    </head>
+    <body>
+        <div class="topnav">
+            <h1>CONTROL DE NIVEL</h1>
+        </div>
+        <div class="content">
+            <div class="card-grid">
+                <div class="card">
+                    <p class="card-title"> Nivel</p>
+                    <p class="reading"><span id="valor-nivel"></span></p><br><br>
+                    <img id="mi-imagen" src="tank.png" alt="Mi imagen">
+                    <div class="reading" id="nivel-container">
+                        <div id="nivel" class="nivel-bar"></div>
+                    </div><br><br>
+                </div>
+            </div>
+        </div>
+        <div class="content">
+            <div class="card-grid">
+                <div class="card">
+                    <p class="card-title"> Caudal de Entrada</p>
+                    <p class="reading"><span id="qin"></span></p>
+                </div>
+                <div class="card">
+                    <p class="card-title"> Caudal de Salida</p>
+                    <p class="reading"><span id="qout"></span></p>
+                </div>
+                <div class="card">
+                    <p class="card-title"> PWM</p>
+                    <p class="reading"><span id="pwm"></span></p>
+                </div>
+            </div>
+        </div>
+        <div class="slidecontainer">
+            <input type="range" onchange="updateSliderPWM(this)" min="10" max="40" value="10" step="1" oninput="rangeValue.innerText = this.value" class="slider" id="setpoint">
+            <p id="rangeValue">10</p>
+        </div>
+        <script src="script.js"></script>
+    </body>
+</html>

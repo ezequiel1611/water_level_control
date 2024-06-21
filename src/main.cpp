@@ -2,6 +2,11 @@
 #include <Wire.h>
 #include <SPI.h>
 #include <Adafruit_BMP085.h>
+#include <LittleFS.h>
+#include <ESP8266WiFi.h>
+#include <ESPAsyncTCP.h>
+#include <ESPAsyncWebServer.h>
+#include <Arduino_JSON.h>
 
 // CONSTANTES
 #define KInput 0.201
@@ -9,7 +14,7 @@
 #define SOUND_VELOCITY 331 // m/s
 #define Kp 35.615
 #define Ki 4.58
-#define HEIGHT 54.58
+#define HEIGHT 54.81
 
 // PINES
 const byte FlowmeterIn = 14, // (D5) Sensor de Entrada al Tanque
@@ -25,11 +30,21 @@ Adafruit_BMP085 bmp;         // D1=SCL D2=SDA Sensor de Temperatura
 double QIn = 0, QOut = 0;               // Caudales medidos
 volatile int CountIn = 0, CountOut = 0; // Contadores de pulsos
 unsigned long TimeRef = 0, PreviousTime = 0, CurrentTime = 0, Ts = 0;
+unsigned long lastTime = 0;
 long Duration;
-float Distance, SoundVel, Level;
-String command = "nothing";
+float Distance, SoundVel, Level, LevelPrev;
+// WEBSOCKET
+const char* ssid = "ControlDeNivel";
+const char* password = "patronato1914";
+IPAddress ip(192,168,1,200);     
+IPAddress gateway(192,168,1,1);   
+IPAddress subnet(255,255,255,0);  
+AsyncWebServer server(80);
+AsyncWebSocket ws("/ws");
+JSONVar readings;
+String message = "";
 // PI CONTROLLER
-int setpoint = 15;
+int setpoint = 0;
 int PWMset = 0, PWM_prev = 0;
 float error = 0, error_prev = 0, integral = 0;
 
@@ -39,7 +54,13 @@ void IRAM_ATTR FlowIn();
 void IRAM_ATTR FlowOut();
 long UltrasonicSensor(byte TPin, byte EPin);
 float SetSoundVelocity();
-void SendData(double x1, double x2, float x3, int x4, int x5);
+String getSensorReadings();
+void initFS();
+void initWiFi();
+void notifyClients(String sensorReadings);
+void handleWebSocketMessage(void *arg, uint8_t *data, size_t len);
+void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len);
+void initWebSocket();
 
 void setup()
 {
@@ -62,13 +83,15 @@ void setup()
   }
   // Mido la velocidad del sonido
   SoundVel = SetSoundVelocity();
-  // Leo el potenciometro seteando un primer setpoint
-  setpoint = analogRead(Adjust);
-  setpoint = map(setpoint, 0, 1023, 10, 40);
-  // Se espera el comando de inicio
-  do{
-    command = Serial.readStringUntil('\n');
-  } while (command != "start");
+  // Inicializo el websocket
+  initWiFi();
+  initFS();
+  initWebSocket();
+  server.on("/",HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(LittleFS, "/index.html", "text/html");
+  });
+  server.serveStatic("/",LittleFS,"/");
+  server.begin();
   digitalWrite(LedOn, HIGH);
   PreviousTime = millis();
 }
@@ -76,25 +99,24 @@ void setup()
 void loop()
 {
   // put your main code here, to run repeatedly:
-  CountIn = 0;
-  CountOut = 0;
-  TimeRef = millis();
-  // Mido el Caudal
-  interrupts();
-  while ((millis() - TimeRef) < 1000){
-    QIn = (CountIn * KInput);
-    QOut = (CountOut * KOutput);
+  QIn = (CountIn * KInput);
+  QOut = (CountOut * KOutput);
+  if((millis()-lastTime)>1000){
+    String sensorReadings = getSensorReadings();
+    Serial.println(sensorReadings);
+    notifyClients(sensorReadings);
+    CountIn = 0;
+    CountOut = 0;
+    Duration = UltrasonicSensor(Trigger, Echo);
+    Distance = Duration * SoundVel / 2;
+    Level = HEIGHT - Distance;
+    if(abs(Level-LevelPrev)>2){
+      Level = LevelPrev;
+    }
+    LevelPrev = Level; 
+    lastTime = millis();
   }
-  noInterrupts();
-  // Obtención del Nivel Actual
-  Duration = UltrasonicSensor(Trigger, Echo);
-  Distance = Duration * SoundVel / 2;
-  if (Distance >= 15){
-    Level = HEIGHT - Distance; // Este if me permite deshechar malas lecturas
-  }
-  // Leo el potenciometro para saber el setpoint del nivel
-  setpoint = analogRead(Adjust);
-  setpoint = map(setpoint, 0, 1023, 10, 40);
+  ws.cleanupClients();
   // Calcular el periodo de muestreo para el PI
   CurrentTime = millis();
   Ts = (CurrentTime - PreviousTime) / 1000.0; // Convertir a segundos
@@ -112,23 +134,18 @@ void loop()
   analogWrite(WaterPump, PWMset);
   error_prev = error;
   PWM_prev = PWMset;
-  // Envio los datos por puerto serie
-  SendData(QIn, QOut, Level, PWMset, setpoint);
 }
 
 // put function definitions here:
-void IRAM_ATTR FlowIn()
-{
+void IRAM_ATTR FlowIn() {
   CountIn++;
 }
 
-void IRAM_ATTR FlowOut()
-{
+void IRAM_ATTR FlowOut() {
   CountOut++;
 }
 
-long UltrasonicSensor(byte TPin, byte EPin)
-{
+long UltrasonicSensor(byte TPin, byte EPin) {
   long Response;
   // Asegura el 0 en el trigger
   digitalWrite(TPin, LOW);
@@ -141,8 +158,7 @@ long UltrasonicSensor(byte TPin, byte EPin)
   return Response;
 }
 
-float SetSoundVelocity()
-{
+float SetSoundVelocity() {
   float Tc, SV;
   Tc = bmp.readTemperature();
   SV = SOUND_VELOCITY * sqrt(1.0 + (Tc / 273.0));
@@ -150,22 +166,7 @@ float SetSoundVelocity()
   return SV;
 }
 
-void SendData(double x1, double x2, float x3, int x4, int x5)
-{
-  Serial.print("Qi=");
-  Serial.print(x1);
-  Serial.print("/Qo=");
-  Serial.print(x2);
-  Serial.print("/WL=");
-  Serial.print(x3);
-  Serial.print("/DC=");
-  Serial.print(x4);
-  Serial.print("/SP=");
-  Serial.println(x5);
-}
-
-void SetPins()
-{
+void SetPins() {
   pinMode(FlowmeterIn, INPUT);
   pinMode(FlowmeterOut, INPUT);
   pinMode(LedOn, OUTPUT);
@@ -173,4 +174,89 @@ void SetPins()
   pinMode(Adjust, INPUT);
   pinMode(Trigger, OUTPUT);
   pinMode(Echo, INPUT);
+}
+
+String getSensorReadings(){
+  /*CountIn = 0;
+  CountOut = 0;
+  TimeRef = millis();
+  // Mido el Caudal
+  //interrupts();
+  while ((millis() - TimeRef) < 1000){
+    QIn = (CountIn * KInput);
+    QOut = (CountOut * KOutput);
+  }
+  //noInterrupts();
+  // Obtención del Nivel Actual
+  Duration = UltrasonicSensor(Trigger, Echo);
+  Distance = Duration * SoundVel / 2;
+  if (Distance >= 15){
+    Level = HEIGHT - Distance; // Este if me permite deshechar malas lecturas
+  }*/
+  readings["nivel"] = String(Level);
+  readings["qin"] = String(QIn);
+  readings["qout"] = String(QOut);
+  readings["pwm"] = String(PWMset);
+  String jsonString = JSON.stringify(readings);
+  return jsonString;
+}
+
+void initFS(){
+  if(!LittleFS.begin()){
+    Serial.println("Error montando LittleFS.");
+  }
+  else{
+    Serial.println("LittleFS se montó correctamente.");
+  }
+}
+
+void initWiFi(){
+  WiFi.softAP(ssid, password);
+  WiFi.softAPConfig(ip, gateway, subnet);
+  Serial.print("Iniciando AP:\t");
+  Serial.println(ssid);
+  Serial.print("IP address:\t");
+  Serial.println(WiFi.softAPIP());
+}
+
+void notifyClients(String sensorReadings){
+  ws.textAll(sensorReadings);
+}
+
+void handleWebSocketMessage(void *arg, uint8_t *data, size_t len){
+  AwsFrameInfo *info = (AwsFrameInfo*)arg;
+  if(info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT){
+    message = String((char*)data);
+
+    if(message.equals("getReadings")){
+      String sensorReadings = getSensorReadings();
+      Serial.print(sensorReadings);
+      notifyClients(sensorReadings);
+    }
+    else{
+      setpoint = message.toInt();
+    }
+  }
+}
+
+void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len){
+  switch (type) {
+    case WS_EVT_CONNECT:
+      Serial.printf("WebSocket client #%u connected from %s\n", client->id(), client->remoteIP().toString().c_str());
+      break;
+    case WS_EVT_DISCONNECT:
+      Serial.printf("WebSocket client #%u disconnected\n", client->id());
+      break;
+    case WS_EVT_DATA:
+      handleWebSocketMessage(arg, data, len);
+      break;
+    case WS_EVT_PONG:
+    case WS_EVT_ERROR:
+      break;
+  }
+}
+
+void initWebSocket(){
+  ws.onEvent(onEvent);
+  server.addHandler(&ws);
 }

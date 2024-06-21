@@ -1,0 +1,128 @@
+html {
+    font-family: Arial, Helvetica, sans-serif;
+    display: inline-block;
+    text-align: center;
+}
+h1 {
+    font-size: 1.8rem;
+    color: white;
+}
+.topnav {
+    overflow: hidden;
+    background-color: #0A1128;
+}
+body {
+    margin: 0;
+}
+.content {
+    padding: 50px;
+}
+.card-grid {
+    max-width: 800px;
+    margin: 0 auto;
+    display: grid;
+    grid-gap: 2rem;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+.card {
+    background-color: white;
+    box-shadow: 2px 2px 12px 1px rgba(140,140,140,.5);
+}
+.card-title {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #034078;
+}
+.reading {
+    font-size: 1.2rem;
+    color: #1282A2;
+}
+.slidecontainer {
+    width: 100%;
+    /* Width of the outside container */
+}
+
+/* The slider itself */
+.slider {
+    -webkit-appearance: none;
+    /* Override default CSS styles */
+    appearance: none;
+    width: 75%;
+    /* Full-width */
+    height: 25px;
+    /* Specified height */
+    background: #d3d3d3;
+    /* Grey background */
+    outline: none;
+    /* Remove outline */
+    opacity: 0.7;
+    /* Set transparency (for mouse-over effects on hover) */
+    -webkit-transition: .2s;
+    /* 0.2 seconds transition on hover */
+    transition: opacity .2s;
+}
+
+/* Mouse-over effects */
+.slider:hover {
+    opacity: 1;
+    /* Fully shown on mouse-over */
+}
+
+/* The slider handle (use -webkit- (Chrome, Opera, Safari, Edge) and -moz- (Firefox) to override default look) */
+.slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    /* Override default look */
+    appearance: none;
+    width: 25px;
+    /* Set a specific slider handle width */
+    height: 25px;
+    /* Slider handle height */
+    background: #04AA6D;
+    /* Green background */
+    cursor: pointer;
+    /* Cursor on hover */
+}
+
+.slider::-moz-range-thumb {
+    width: 25px;
+    /* Set a specific slider handle width */
+    height: 25px;
+    /* Slider handle height */
+    background: #04AA6D;
+    /* Green background */
+    cursor: pointer;
+    /* Cursor on hover */
+}
+
+#mi-imagen {
+    position: absolute; /* Opción: puedes usar 'fixed' si quieres que la imagen se mantenga fija en la ventana */
+    top: 214px;
+    left: calc(50% - 126px);
+    z-index: 9999; /* Asegura que la imagen esté en el frente */
+    width: 256px;
+    height: 256px;
+}
+
+/* Nuevo estilo para el contenedor de la barra */
+#nivel-container {
+    bottom: 50px;
+    height: 172px; /* Altura del contenedor de la barra */
+    width: 120px;   /* Ancho del contenedor de la barra */
+    background-color: #e0e0e0; /* Color de fondo del contenedor */
+    position: relative;
+    margin: 0 auto;
+    border: 1px solid #ccc; /* Borde opcional para mejor visualización */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Nuevo estilo para la barra de nivel */
+.nivel-bar {
+    width: 100%; /* La barra ocupa todo el ancho del contenedor */
+    background-color: #1282A2; /* Color azul de la barra */
+    position: absolute;
+    bottom: 0;
+    height: 0; /* Altura inicial de la barra */
+    transition: height 0.5s; /* Transición suave para cambios de altura */
+}
