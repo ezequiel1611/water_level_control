@@ -7,14 +7,19 @@
 #include <ESPAsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include <Arduino_JSON.h>
+#include <SimpleKalmanFilter.h>
 
 // CONSTANTES
-#define KInput 0.201
-#define KOutput 0.218
-#define SOUND_VELOCITY 331 // m/s
-#define Kp 35.615
-#define Ki 4.58
-#define HEIGHT 54.81
+#define KInput 0.201  //Constante del Caudalimetro de entrada
+#define KOutput 0.218 //Constante del Caudalimetro de salida
+#define SOUND_VELOCITY 331 // m/s Velocidad del sonido a T amb
+#define Kp 35.615 //Constante Proporcional
+#define Ki 4.58   //Constante Integral
+#define HEIGHT 54.79  //Distancia al fondo del tanque
+#define STDEV 0.27 // Desviación Estandar del HC-SR04
+
+// FILTRO DE KALMAN
+SimpleKalmanFilter kalmanFilter(STDEV, 1, 1);
 
 // PINES
 const byte FlowmeterIn = 14, // (D5) Sensor de Entrada al Tanque
@@ -31,8 +36,9 @@ double QIn = 0, QOut = 0;               // Caudales medidos
 volatile int CountIn = 0, CountOut = 0; // Contadores de pulsos
 unsigned long TimeRef = 0, PreviousTime = 0, CurrentTime = 0, Ts = 0;
 unsigned long lastTime = 0;
-long Duration;
-float Distance, SoundVel, Level, LevelPrev;
+float SoundVel, Level;
+//long Duration;
+//float Distance, SoundVel, Level, LevelPrev;
 // WEBSOCKET
 const char* ssid = "ControlDeNivel";
 const char* password = "patronato1914";
@@ -54,6 +60,7 @@ void IRAM_ATTR FlowIn();
 void IRAM_ATTR FlowOut();
 long UltrasonicSensor(byte TPin, byte EPin);
 float SetSoundVelocity();
+float getLevelDistance();
 String getSensorReadings();
 void initFS();
 void initWiFi();
@@ -99,21 +106,15 @@ void setup()
 void loop()
 {
   // put your main code here, to run repeatedly:
-  QIn = (CountIn * KInput);
-  QOut = (CountOut * KOutput);
-  if((millis()-lastTime)>1000){
+  QIn = (CountIn * KInput)*2.0;
+  QOut = (CountOut * KOutput)*2.0;
+  if((millis()-lastTime)>500){
     String sensorReadings = getSensorReadings();
     Serial.println(sensorReadings);
     notifyClients(sensorReadings);
     CountIn = 0;
     CountOut = 0;
-    Duration = UltrasonicSensor(Trigger, Echo);
-    Distance = Duration * SoundVel / 2;
-    Level = HEIGHT - Distance;
-    if(abs(Level-LevelPrev)>2){
-      Level = LevelPrev;
-    }
-    LevelPrev = Level; 
+    Level = getLevelDistance();
     lastTime = millis();
   }
   ws.cleanupClients();
@@ -166,6 +167,13 @@ float SetSoundVelocity() {
   return SV;
 }
 
+float getLevelDistance() {
+  long Duration = UltrasonicSensor(Trigger, Echo);
+  float LevelDistance = HEIGHT - (Duration * SoundVel) / 2.0;
+  float filteredDistance = kalmanFilter.updateEstimate(LevelDistance);
+  return filteredDistance;
+}
+
 void SetPins() {
   pinMode(FlowmeterIn, INPUT);
   pinMode(FlowmeterOut, INPUT);
@@ -177,22 +185,6 @@ void SetPins() {
 }
 
 String getSensorReadings(){
-  /*CountIn = 0;
-  CountOut = 0;
-  TimeRef = millis();
-  // Mido el Caudal
-  //interrupts();
-  while ((millis() - TimeRef) < 1000){
-    QIn = (CountIn * KInput);
-    QOut = (CountOut * KOutput);
-  }
-  //noInterrupts();
-  // Obtención del Nivel Actual
-  Duration = UltrasonicSensor(Trigger, Echo);
-  Distance = Duration * SoundVel / 2;
-  if (Distance >= 15){
-    Level = HEIGHT - Distance; // Este if me permite deshechar malas lecturas
-  }*/
   readings["nivel"] = String(Level);
   readings["qin"] = String(QIn);
   readings["qout"] = String(QOut);
