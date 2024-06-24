@@ -96,7 +96,7 @@ body {
 
 #mi-imagen {
     position: absolute; /* Opción: puedes usar 'fixed' si quieres que la imagen se mantenga fija en la ventana */
-    top: 130px;
+    top: 170px;
     left: calc(50% - 126px);
     z-index: 9999; /* Asegura que la imagen esté en el frente */
     width: 256px;

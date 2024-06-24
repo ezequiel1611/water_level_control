@@ -1,5 +1,7 @@
 var gateway = `ws://${window.location.hostname}/ws`;
 var websocket;
+var startSending = false; // Variable para controlar el envío repetido
+var stopSending = false;
 // Init web socket when the page loads
 window.addEventListener('load', onload);
 
@@ -8,16 +10,18 @@ var output = document.getElementById("demo");
 output.innerHTML = slider.value; // Display the default slider value
 
 // Update the current slider value (each time you drag the slider handle)
-slider.oninput = function() {
-  output.innerHTML = this.value;
-} 
+slider.oninput = function () {
+    output.innerHTML = this.value;
+}
 
 function onload(event) {
     initWebSocket();
 }
 
-function getReadings(){
-    websocket.send("getReadings");
+function getReadings() {
+    if (startSending == false || stopSending == false) {
+        websocket.send("getReadings");
+    }
 }
 
 function initWebSocket() {
@@ -31,7 +35,9 @@ function initWebSocket() {
 // When websocket is established, call the getReadings() function
 function onOpen(event) {
     console.log('Connection opened');
-    getReadings();
+    if (startSending == false || stopSending == false) {
+        getReadings();
+    }
 }
 
 function onClose(event) {
@@ -41,16 +47,18 @@ function onClose(event) {
 
 // Function that receives the message from the ESP32 with the readings
 function onMessage(event) {
-    console.log(event.data);
-    var myObj = JSON.parse(event.data);
-    var keys = Object.keys(myObj);
-    var valorNivel = myObj.nivel;
-    var valorNiveInt = parseInt(valorNivel);
-    updateNivel(valorNiveInt);
-    document.getElementById('valor-nivel').innerHTML = myObj[keys[0]];
-    for (var i = 1; i < keys.length; i++){
-        var key = keys[i];
-        document.getElementById(key).innerHTML = myObj[key];
+    if (startSending == false || stopSending == false) {
+        console.log(event.data);
+        var myObj = JSON.parse(event.data);
+        var keys = Object.keys(myObj);
+        var valorNivel = myObj.nivel;
+        var valorNiveInt = parseInt(valorNivel);
+        updateNivel(valorNiveInt);
+        document.getElementById('valor-nivel').innerHTML = myObj[keys[0]];
+        for (var i = 1; i < keys.length; i++) {
+            var key = keys[i];
+            document.getElementById(key).innerHTML = myObj[key];
+        }
     }
 }
 
@@ -72,9 +80,39 @@ function updateNivel(value) {
 }
 
 function sendStart() {
-	websocket.send("start");
+    startSending = true;
+    console.log("Start Button Clicked.");
+    // Enviar el comando "start" inmediatamente
+    websocket.send("start");
+
+    // Repetir el comando "start" cada 100ms
+    var interval = setInterval(function () {
+        websocket.send("start");
+    }, 500);
+
+    // Detener el envío después de 1 segundo
+    setTimeout(function () {
+        clearInterval(interval);
+        console.log("Finished sending start command.");
+        startSending = false;
+    }, 5000);
 }
 
 function sendStop() {
-	websocket.send("stop");
+    stopSending = true;
+    console.log("Stop Button Clicked.");
+    // Enviar el comando "start" inmediatamente
+    websocket.send("stop");
+
+    // Repetir el comando "start" cada 100ms
+    var interval = setInterval(function () {
+        websocket.send("stop");
+    }, 500);
+
+    // Detener el envío después de 1 segundo
+    setTimeout(function () {
+        clearInterval(interval);
+        console.log("Finished sending stop command.");
+        stopSending = false;
+    }, 5000);
 }

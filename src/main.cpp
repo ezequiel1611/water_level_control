@@ -51,7 +51,8 @@ String message = "";
 
 // PI CONTROLLER
 int setpoint = 0;
-int PWMset = 0, PWM_prev = 0, flag = 0;
+int PWMset = 0, PWM_prev = 0;
+volatile int flag = 0;
 float error = 0, error_prev = 0, integral = 0;
 
 // put function declarations here:
@@ -228,10 +229,12 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len){
     else if(message.equals("start")){
       flag = 1;
       digitalWrite(LedOn, HIGH);
+      Serial.println("Start");
     }
     else if(message.equals("stop")){
       flag = 0;
       digitalWrite(LedOn, LOW);
+      Serial.println("Stop");
     }
     else{
       setpoint = message.toInt();
