@@ -70,3 +70,11 @@ function updateNivel(value) {
     var height = ((value - minValue) / (maxValue - minValue)) * containerHeight;
     nivelBar.style.height = height + 'px';
 }
+
+function sendStart() {
+	websocket.send("start");
+}
+
+function sendStop() {
+	websocket.send("stop");
+}

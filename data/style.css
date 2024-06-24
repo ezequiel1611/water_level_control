@@ -15,7 +15,7 @@ body {
     margin: 0;
 }
 .content {
-    padding: 50px;
+    padding: 10px;
 }
 .card-grid {
     max-width: 800px;
@@ -96,7 +96,7 @@ body {
 
 #mi-imagen {
     position: absolute; /* Opción: puedes usar 'fixed' si quieres que la imagen se mantenga fija en la ventana */
-    top: 214px;
+    top: 130px;
     left: calc(50% - 126px);
     z-index: 9999; /* Asegura que la imagen esté en el frente */
     width: 256px;
@@ -125,4 +125,50 @@ body {
     bottom: 0;
     height: 0; /* Altura inicial de la barra */
     transition: height 0.5s; /* Transición suave para cambios de altura */
+}
+
+.button-start {
+  display: inline-block;
+  padding: 15px 25px;
+  font-size: 24px;
+  cursor: pointer;
+  text-align: center;
+  text-decoration: none;
+  outline: none;
+  color: #fff;
+  background-color: #04AA6D;
+  border: none;
+  border-radius: 15px;
+  box-shadow: 0 9px #999;
+}
+
+.button-start:hover {background-color: #3e8e41}
+
+.button-start:active {
+  background-color: #3e8e41;
+  box-shadow: 0 5px #666;
+  transform: translateY(4px);
+}
+
+.button-stop {
+  display: inline-block;
+  padding: 15px 25px;
+  font-size: 24px;
+  cursor: pointer;
+  text-align: center;
+  text-decoration: none;
+  outline: none;
+  color: #fff;
+  background-color: #bf0000;
+  border: none;
+  border-radius: 15px;
+  box-shadow: 0 9px #999;
+}
+
+.button-stop:hover {background-color: #800000}
+
+.button-stop:active {
+  background-color: #800000;
+  box-shadow: 0 5px #666;
+  transform: translateY(4px);
 }
