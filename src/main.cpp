@@ -37,8 +37,7 @@ volatile int CountIn = 0, CountOut = 0; // Contadores de pulsos
 unsigned long TimeRef = 0, PreviousTime = 0, CurrentTime = 0, Ts = 0;
 unsigned long lastTime = 0;
 float SoundVel, Level;
-//long Duration;
-//float Distance, SoundVel, Level, LevelPrev;
+
 // WEBSOCKET
 const char* ssid = "ControlDeNivel";
 const char* password = "patronato1914";
@@ -49,9 +48,10 @@ AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 JSONVar readings;
 String message = "";
+
 // PI CONTROLLER
 int setpoint = 0;
-int PWMset = 0, PWM_prev = 0;
+int PWMset = 0, PWM_prev = 0, flag = 0;
 float error = 0, error_prev = 0, integral = 0;
 
 // put function declarations here:
@@ -132,7 +132,7 @@ void loop()
   if (PWMset <= 0){
     PWMset = 0;
   }
-  analogWrite(WaterPump, PWMset);
+  analogWrite(WaterPump, (flag * PWMset));
   error_prev = error;
   PWM_prev = PWMset;
 }
@@ -224,6 +224,12 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len){
       String sensorReadings = getSensorReadings();
       Serial.print(sensorReadings);
       notifyClients(sensorReadings);
+    }
+    else if(message.equals("start")){
+      flag = 1;
+    }
+    else if(message.equals("stop")){
+      flag = 0;
     }
     else{
       setpoint = message.toInt();
