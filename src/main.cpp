@@ -227,9 +227,11 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len){
     }
     else if(message.equals("start")){
       flag = 1;
+      digitalWrite(LedOn, HIGH);
     }
     else if(message.equals("stop")){
       flag = 0;
+      digitalWrite(LedOn, LOW);
     }
     else{
       setpoint = message.toInt();
