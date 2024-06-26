@@ -16,10 +16,10 @@
 #define Kp 35.615 //Constante Proporcional
 #define Ki 4.58   //Constante Integral
 #define HEIGHT 54.79  //Distancia al fondo del tanque
-#define STDEV 0.27 // Desviación Estandar del HC-SR04
+#define STDEV 0.35 // Desviación Estandar del HC-SR04
 
 // FILTRO DE KALMAN
-SimpleKalmanFilter kalmanFilter(STDEV, 1, 1);
+SimpleKalmanFilter kalmanFilter(STDEV, 1, 0.01);
 
 // PINES
 const byte FlowmeterIn = 14, // (D5) Sensor de Entrada al Tanque
@@ -69,6 +69,7 @@ void notifyClients(String sensorReadings);
 void handleWebSocketMessage(void *arg, uint8_t *data, size_t len);
 void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len);
 void initWebSocket();
+float getLevelDistanceFiltered();
 
 void setup()
 {
@@ -107,9 +108,9 @@ void setup()
 void loop()
 {
   // put your main code here, to run repeatedly:
-  QIn = (CountIn * KInput)*2.0;
-  QOut = (CountOut * KOutput)*2.0;
-  if((millis()-lastTime)>500){
+  QIn = (CountIn * KInput);
+  QOut = (CountOut * KOutput);
+  if((millis()-lastTime)>1000){
     String sensorReadings = getSensorReadings();
     Serial.println(sensorReadings);
     notifyClients(sensorReadings);
@@ -171,7 +172,11 @@ float SetSoundVelocity() {
 float getLevelDistance() {
   long Duration = UltrasonicSensor(Trigger, Echo);
   float LevelDistance = HEIGHT - (Duration * SoundVel) / 2.0;
-  float filteredDistance = kalmanFilter.updateEstimate(LevelDistance);
+  return LevelDistance;
+}
+
+float getLevelDistanceFiltered() {
+  float filteredDistance = kalmanFilter.updateEstimate(Level) + 0.5;
   return filteredDistance;
 }
 
@@ -186,7 +191,8 @@ void SetPins() {
 }
 
 String getSensorReadings(){
-  readings["nivel"] = String(Level);
+  float level_filtered = getLevelDistanceFiltered();
+  readings["nivel"] = String(level_filtered);
   readings["qin"] = String(QIn);
   readings["qout"] = String(QOut);
   readings["pwm"] = String(PWMset);
