@@ -35,7 +35,7 @@ function initWebSocket() {
 // When websocket is established, call the getReadings() function
 function onOpen(event) {
     console.log('Connection opened');
-    if (startSending == false || stopSending == false) {
+    if (startSending == false && stopSending == false) {
         getReadings();
     }
 }
@@ -47,7 +47,7 @@ function onClose(event) {
 
 // Function that receives the message from the ESP32 with the readings
 function onMessage(event) {
-    if (startSending == false || stopSending == false) {
+    if (startSending == false && stopSending == false) {
         console.log(event.data);
         var myObj = JSON.parse(event.data);
         var keys = Object.keys(myObj);
@@ -88,31 +88,33 @@ function sendStart() {
     // Repetir el comando "start" cada 100ms
     var interval = setInterval(function () {
         websocket.send("start");
-    }, 500);
+        console.log("start");
+    }, 100);
 
     // Detener el envío después de 1 segundo
     setTimeout(function () {
         clearInterval(interval);
         console.log("Finished sending start command.");
         startSending = false;
-    }, 5000);
+    }, 1000);
 }
 
 function sendStop() {
     stopSending = true;
     console.log("Stop Button Clicked.");
-    // Enviar el comando "start" inmediatamente
+    // Enviar el comando "stop" inmediatamente
     websocket.send("stop");
 
-    // Repetir el comando "start" cada 100ms
+    // Repetir el comando "stop" cada 100ms
     var interval = setInterval(function () {
         websocket.send("stop");
-    }, 500);
+        console.log("stop");
+    }, 100);
 
     // Detener el envío después de 1 segundo
     setTimeout(function () {
         clearInterval(interval);
         console.log("Finished sending stop command.");
         stopSending = false;
-    }, 5000);
+    }, 1000);
 }

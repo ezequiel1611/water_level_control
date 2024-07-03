@@ -19,7 +19,7 @@
 #define STDEV 0.35 // Desviación Estandar del HC-SR04
 
 // FILTRO DE KALMAN
-SimpleKalmanFilter kalmanFilter(STDEV, 1, 0.01);
+SimpleKalmanFilter kalmanFilter(STDEV, 1, 0.05);
 
 // PINES
 const byte FlowmeterIn = 14, // (D5) Sensor de Entrada al Tanque
@@ -70,6 +70,7 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len);
 void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len);
 void initWebSocket();
 float getLevelDistanceFiltered();
+String cleanMessage(String rawMessage);
 
 void setup()
 {
@@ -117,6 +118,8 @@ void loop()
     CountIn = 0;
     CountOut = 0;
     Level = getLevelDistance();
+    if(Level > 24.5){Level = Level - 0.2;}
+    else if(Level < 18.0){Level = Level + 0.2;}
     lastTime = millis();
   }
   ws.cleanupClients();
@@ -176,7 +179,7 @@ float getLevelDistance() {
 }
 
 float getLevelDistanceFiltered() {
-  float filteredDistance = kalmanFilter.updateEstimate(Level) + 0.5;
+  float filteredDistance = kalmanFilter.updateEstimate(Level) + 0.3;
   return filteredDistance;
 }
 
@@ -222,29 +225,50 @@ void notifyClients(String sensorReadings){
   ws.textAll(sensorReadings);
 }
 
+String cleanMessage(String rawMessage) {
+    if (rawMessage.length() > 2){
+      return rawMessage.substring(0,3);
+    }
+    else {
+      return rawMessage;
+    }
+}
+
 void handleWebSocketMessage(void *arg, uint8_t *data, size_t len){
   AwsFrameInfo *info = (AwsFrameInfo*)arg;
   if(info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT){
-    message = String((char*)data);
+    String rawMessage = String((char*)data);
+    Serial.print("Raw message received: ");
+    Serial.println(rawMessage);
+       
+    message = cleanMessage(rawMessage);
 
-    if(message.equals("getReadings")){
-      String sensorReadings = getSensorReadings();
-      Serial.print(sensorReadings);
-      notifyClients(sensorReadings);
-    }
-    else if(message.equals("start")){
-      flag = 1;
-      digitalWrite(LedOn, HIGH);
-      Serial.println("Start");
-    }
-    else if(message.equals("stop")){
+    Serial.print("Cleaned message: ");
+    Serial.println(message);
+
+    if(message.equals("sto")){
       flag = 0;
       digitalWrite(LedOn, LOW);
       Serial.println("Stop");
     }
+    else if(message.equals("sta")){
+      flag = 1;
+      digitalWrite(LedOn, HIGH);
+      Serial.println("Start");
+    }
+    else if(message.equals("get")){
+      String sensorReadings = getSensorReadings();
+      Serial.print(sensorReadings);
+      notifyClients(sensorReadings);
+    }
     else{
       setpoint = message.toInt();
+      Serial.print("New setpoint: ");
+      Serial.println(setpoint);
     }
+  }
+  else{
+    Serial.println("WebSocket message is not valid");
   }
 }
 
