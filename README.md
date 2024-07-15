@@ -1,5 +1,5 @@
 # Resumen del Proyecto
-El informe describe el diseño, análisis y fabricación de un depósito de agua, con una
+Este proyecto se basa en el diseño, análisis y fabricación de un depósito de agua, con una
 salida y una entrada de agua, cuyo nivel del líquido es controlado para mantenerlo estable en
 el valor que el usuario desee. Empleando un sensor ultrasónico se mide el nivel del agua en
 tiempo real y un controlador PI implementado en el microcontrolador ESP8266, de acuerdo
