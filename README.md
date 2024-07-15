@@ -9,7 +9,7 @@ sensores de caudal empleados, para verificar como afecta la temperatura al senso
 para verificar la linealidad del control de potencia de la bomba y para determinar el rango de
 linealidad del sistema. Los resultados obtenidos demuestran que es correcto asumir un rango
 lineal de funcionamiento y que dentro del mismo el controlador PI funciona correctamente
-manteniendo el nivel estable con un error del %5.
+manteniendo el nivel estable con un error del 5%.
 
 # Requisitos
 - Visual Studio Code
@@ -94,3 +94,26 @@ haga click en *Upload Filesystem Image*.
 
 Con esto, tanto el programa de control como la página web ya se comenzarán a funcionar apenas se energize el sistema.
 
+## Establecer la Conexión
+Primeramente debe conectarse a la red WiFi creada por el ESP8266, la cuál será por defecto:
+
+**SSID:** *ControlDeNivel*
+
+**Contraseña:** *patronato1914*
+
+Ahora abrá cualquier navegador web e ingrese la dirección IP de la página web creada, la cuál será por defecto:
+`http://192.168.1.200/`
+
+- Si tiene algún problema a la hora de mantenerse conectado a la red WiFi usando algún dispositivo móvil, vaya
+a la sección de ajustes de WiFi y seleccione la opción de *Ajustes de IP Estática* en lugar de *DHCP*.
+
+## Página Web
+![previsualización de la página web](https://github.com/ezequiel1611/water_level_control/blob/master/web_design.png)
+
+La página web cuenta con tres controles que el usuario puede emplear, los primero dos son botones de *Start* y *Stop*
+que encienden o apagan respectivamente la bomba de agua. Luego se presenta un controlador deslizable, el cuál sirve para que el usuario pueda determinar el nivel del agua deseado que quiere que el sistema mantenga de forma estable. 
+
+Al encender el sistema la bomba estará apagada y el usuario debe presionar el botón de *Start* para poder comenzar
+a usar el control de nivel. Un LED rojo indica el estado de la bomba, siempre que el mismo este apagado la bomba también lo estará y viceversa.
+
+Una vez encendida la bomba, el nivel inicial es 0 cm por lo el sistema no actuará en un principio. El usuario debe usar el control deslizable para establecer el nivel deseado, el cual se muestra en la parte inferior del slider, y cuando se suelta el control ahí el sistema comenzará a trabajar para lograr establecer ese nivel del líquido. En cualquier momento el usuario puede cambiar el nivel objetivo deseado. También podrá apagar o encender la bomba en cualquier momento sin importar el nivel objetivo establecido.
