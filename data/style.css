@@ -27,6 +27,7 @@ body {
 .card {
     background-color: white;
     box-shadow: 2px 2px 12px 1px rgba(140,140,140,.5);
+    max-height: 400px;
 }
 .card-title {
     font-size: 1.2rem;
@@ -95,17 +96,19 @@ body {
 }
 
 #mi-imagen {
-    position: absolute; /* Opción: puedes usar 'fixed' si quieres que la imagen se mantenga fija en la ventana */
-    top: 170px;
-    left: calc(50% - 126px);
+    position: relative; /* Opción: puedes usar 'fixed' si quieres que la imagen se mantenga fija en la ventana */
+    /*top: 16%;*/
+    /*left: 35%;*/
+    justify-content: center;
+    align-items: center;
     z-index: 9999; /* Asegura que la imagen esté en el frente */
-    width: 256px;
+    width: 266px;
     height: 256px;
 }
 
 /* Nuevo estilo para el contenedor de la barra */
 #nivel-container {
-    bottom: 50px;
+    bottom: 260px;
     height: 172px; /* Altura del contenedor de la barra */
     width: 120px;   /* Ancho del contenedor de la barra */
     background-color: #e0e0e0; /* Color de fondo del contenedor */
