@@ -8,6 +8,7 @@
 #include <ESPAsyncWebServer.h>
 #include <Arduino_JSON.h>
 #include <SimpleKalmanFilter.h>
+#include <DNSServer.h>
 
 // CONSTANTES
 #define KInput 0.201  //Constante del Caudalimetro de entrada
@@ -15,7 +16,7 @@
 #define SOUND_VELOCITY 331 // m/s Velocidad del sonido a T amb
 #define Kp 35.615 //Constante Proporcional
 #define Ki 4.58   //Constante Integral
-#define HEIGHT 54.79  //Distancia al fondo del tanque
+#define HEIGHT 54.10  //Distancia al fondo del tanque
 #define STDEV 0.35 // Desviación Estandar del HC-SR04
 
 // FILTRO DE KALMAN
@@ -48,6 +49,10 @@ AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 JSONVar readings;
 String message = "";
+
+// SERVER DNS
+const byte DNS_PORT = 53;
+DNSServer dns_server;
 
 // PI CONTROLLER
 int setpoint = 0;
@@ -102,6 +107,9 @@ void setup()
   });
   server.serveStatic("/",LittleFS,"/");
   server.begin();
+  //
+  dns_server.start(DNS_PORT, "*", WiFi.softAPIP());
+  //
   digitalWrite(LedOn, HIGH);
   PreviousTime = millis();
 }
@@ -118,8 +126,10 @@ void loop()
     CountIn = 0;
     CountOut = 0;
     Level = getLevelDistance();
-    if(Level > 24.5){Level = Level - 0.2;}
-    else if(Level < 18.0){Level = Level + 0.2;}
+    if(Level < 15){Level = Level + 1.0;}
+    else if(Level < 20 && Level > 15){Level = Level + 0.4;}
+    else if(Level < 30 && Level > 20){Level = Level + 0.8;}
+    else if(Level < 40 && Level > 30){Level = Level + 1.2;}
     lastTime = millis();
   }
   ws.cleanupClients();
@@ -140,6 +150,9 @@ void loop()
   analogWrite(WaterPump, (flag * PWMset));
   error_prev = error;
   PWM_prev = PWMset;
+  //
+  dns_server.processNextRequest();
+  //
 }
 
 // put function definitions here:
@@ -179,7 +192,7 @@ float getLevelDistance() {
 }
 
 float getLevelDistanceFiltered() {
-  float filteredDistance = kalmanFilter.updateEstimate(Level) + 0.3;
+  float filteredDistance = kalmanFilter.updateEstimate(Level);
   return filteredDistance;
 }
 
